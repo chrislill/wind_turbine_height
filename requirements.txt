@@ -10,4 +10,6 @@ python-dotenv
 requests
 scikit-learn
 seaborn
+tensorflow
+tensorflow_addons
 tqdm
