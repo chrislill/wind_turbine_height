@@ -1,0 +1,9 @@
+*checkpoint.ipynb
+venv/
+data
+.vscode/
+.idea/
+debug.log
+*.csv
+.env.secret
+

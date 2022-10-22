@@ -1,0 +1,13 @@
+black[d]
+ipython
+jupyter
+matplotlib
+notebook-as-pdf
+numpy
+pandas
+Pillow
+python-dotenv
+requests
+scikit-learn
+seaborn
+tqdm
