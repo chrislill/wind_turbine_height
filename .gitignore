@@ -6,4 +6,5 @@ data
 debug.log
 *.csv
 .env.secret
+notebooks/de421.bsp
 
