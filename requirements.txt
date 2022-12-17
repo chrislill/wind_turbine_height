@@ -1,5 +1,6 @@
 black[d]
 ephem
+geopandas
 ipython
 jupyter
 matplotlib
@@ -7,10 +8,12 @@ notebook-as-pdf
 numpy
 pandas
 Pillow
+pyodbc
 python-dotenv
 requests
 scikit-learn
 seaborn
+shapely
 skyfield
 tensorflow
 tensorflow_addons
