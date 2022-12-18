@@ -32,6 +32,10 @@ def main():
         .assign(geometry=lambda x: gpd.points_from_xy(x.longitude, x.latitude, crs="EPSG:4326"))
         .set_geometry("geometry")
         .to_crs("EPSG:25830")
+        .assign(
+            site_x=lambda x: x.geometry.x.round(2),
+            site_y=lambda x: x.geometry.y.round(2),
+        )
     )
 
     # Load shape files giving the location of each orthophoto tile
@@ -64,8 +68,8 @@ def main():
         .query("photo_distance < 3100")
         .reset_index(drop=True)
         .loc[:, [
-            "site", "latitude", "longitude", "num_turbines", "hub_height",
-            "photo_file", "photo_timestamp", "orthophoto_name"
+            "site", "latitude", "longitude", "num_turbines", "hub_height", "photo_file",
+            "photo_timestamp", "orthophoto_name", "site_x", "site_y"
         ]]
     )
     site_photos.to_csv("data/site_photo_metadata.csv", index=False)
