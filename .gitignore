@@ -1,6 +1,7 @@
 *checkpoint.ipynb
 venv/
 data
+packages
 .vscode/
 .idea/
 debug.log

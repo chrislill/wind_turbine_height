@@ -51,7 +51,7 @@ def main():
         .assign(
             distance_to_centroid=lambda x: x.distance(x.tile_centroid),
             orthophoto_name=lambda x: (
-                    "PNOA-MA-OF-ETRS89-HU" + x.HUSO.astype(str) + "-H50-" + x.HMTN50.astype(str)
+                    "PNOA_MA_OF_ETRS89_HU" + x.HUSO.astype(str) + "_H50_" + x.HMTN50.astype(str)
             )
         )
         .sort_values(["site", "distance_to_centroid"])
