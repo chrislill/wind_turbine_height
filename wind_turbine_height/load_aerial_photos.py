@@ -6,11 +6,10 @@ import zipfile
 
 import dotenv
 import geopandas as gpd
+import numpy as np
 import pandas as pd
 import pyodbc
-import shapely.speedups
 
-shapely.speedups.enable()
 
 def main():
     dotenv.load_dotenv('.env')
@@ -53,15 +52,19 @@ def main():
         .assign(distance_to_centroid=lambda x: x.distance(x.tile_centroid))
         .sort_values(["site", "distance_to_centroid"])
         .drop_duplicates("site")
+        .drop(columns="index_right")
     )
     photo_metadata = load_photo_metadata()
+    site_photos = gpd.sjoin_nearest(
+        site_tiles, photo_metadata, how="left", distance_col="photo_distance"
+    ).query("photo_distance < 3100").reset_index(drop=True)
 
     print("Done")
 
 
 def load_photo_metadata():
     """Load aerial photo metadata from zipped access database files"""
-    metadata_path = pathlib.Path('data\photo_metadata')
+    metadata_path = pathlib.Path('data/photo_metadata')
     database_files = list(metadata_path.glob("**/PNOA*.mdb"))
     if len(database_files) > 0:
         # TODO: Implement logging
@@ -69,7 +72,7 @@ def load_photo_metadata():
     else:
         zip_files = list(metadata_path.glob("**/*.zip"))
         if len(zip_files) == 0:
-            print("Please copy zip files to data\photo_metadata.")
+            print("Please copy zip files to data/photo_metadata.")
         else:
             # Abbreviation PNOA: Plan Nacional de Ortofotografía Aérea  # noqa
             pnoa_regex = re.compile(".*/PNOA_.*mdb")
@@ -89,28 +92,61 @@ def load_photo_metadata():
     photo_list = []
     for database_file in database_files:
         connection_string = (
-            r"DRIVER={Microsoft Access Driver (*.mdb, *.accdb)};" rf"DBQ={str(database_file)};"
+            r"DRIVER={Microsoft Access Driver (*.mdb, *.accdb)};" 
+            rf"DBQ={str(database_file.resolve())};"
         )
-        with pyodbc.connect(connection_string) as connection:
-            cursor = connection.cursor()
-            try:
+        try:
+            with pyodbc.connect(connection_string) as connection:
+                cursor = connection.cursor()
+                results = pd.DataFrame.from_records(
+                    cursor.execute(
+                        "SELECT FOTOGRAMA_TIFF, FECHA, HORA, LAT_ETRS89, LONG_ETRS89 "  # noqa
+                        "FROM VueloEjecutado"  # noqa
+                    ).fetchall(),
+                    columns=["file", "date", "time", "photo_latitude", "photo_longitude"]
+                )
+
+                # There is a mixture of datetime objects and strings. Format them all as strings
+                # Then combine
+                if pd.api.types.infer_dtype(results.date) == 'string':
+                    results.date = results.date.str.slice(0, 11)
+                else:
+                    results.date = results.date.dt.strftime(date_format="%d/%m/%Y")
+                if pd.api.types.infer_dtype(results.time) == 'string':
+                    results.time = (
+                        results.time.str.strip()
+                        .str.replace("60", "00")
+                        .str.replace("1899-12-39 ", "")
+                    )
+                else:
+                    results.time = results.time.dt.strftime(date_format="%X")
                 results = (
-                    cursor.execute("SELECT FOTOGRAMA_TIFF, FECHA, HORA FROM VueloEjecutado")  # noqa
-                    .fetchall()
+                    results
+                    .assign(photo_timestamp=lambda x: pd.to_datetime(
+                        x.date + " " + x.time, dayfirst=True, utc=True
+                    ))
+                    .drop(columns=["date", "time"])
                 )
-                photo_list.append(
-                    pd.DataFrame.from_records(results, columns=["file", "date", "time"])
-                )
-            except pyodbc.ProgrammingError:
-                print(f"Skipping {database_file} because the query failed.")
+                photo_list.append(results)
+
+        # TODO: Can we fix these errors. 16/91 labels are being dropped
+        except (pyodbc.ProgrammingError, pyodbc.Error):
+            print(f"Skipping {database_file} because the query failed.")
     photos = (
         pd.concat(photo_list)
         .sort_values("file")
-        .assign(file=lambda x: x.file.str.replace("-", "_"))
+        .assign(
+            geometry=lambda x: gpd.points_from_xy(
+                x.photo_longitude, x.photo_latitude, crs="ETRS89"
+            )
+        )
+        .set_geometry("geometry")
+        .to_crs("EPSG:25830")
+        .assign(photo_centroid=lambda x: x.geometry)
+        .reset_index(drop=True)
     )
 
     return photos
-
 
 
 if __name__ == '__main__':
