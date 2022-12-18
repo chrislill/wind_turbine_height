@@ -6,7 +6,6 @@ import zipfile
 
 import dotenv
 import geopandas as gpd
-import numpy as np
 import pandas as pd
 import pyodbc
 
@@ -49,16 +48,27 @@ def main():
     # is closest to the centroid of the tile
     site_tiles = (
         gpd.sjoin(sites, orthophoto_tiles, how="left", predicate="within")
-        .assign(distance_to_centroid=lambda x: x.distance(x.tile_centroid))
+        .assign(
+            distance_to_centroid=lambda x: x.distance(x.tile_centroid),
+            orthophoto_name=lambda x: (
+                    "PNOA-MA-OF-ETRS89-HU" + x.HUSO.astype(str) + "-H50-" + x.HMTN50.astype(str)
+            )
+        )
         .sort_values(["site", "distance_to_centroid"])
         .drop_duplicates("site")
         .drop(columns="index_right")
     )
     photo_metadata = load_photo_metadata()
-    site_photos = gpd.sjoin_nearest(
-        site_tiles, photo_metadata, how="left", distance_col="photo_distance"
-    ).query("photo_distance < 3100").reset_index(drop=True)
-
+    site_photos = (
+        gpd.sjoin_nearest(site_tiles, photo_metadata, how="left", distance_col="photo_distance")
+        .query("photo_distance < 3100")
+        .reset_index(drop=True)
+        .loc[:, [
+            "site", "latitude", "longitude", "num_turbines", "hub_height",
+            "photo_file", "photo_timestamp", "orthophoto_name"
+        ]]
+    )
+    site_photos.to_csv("data/site_photo_metadata.csv", index=False)
     print("Done")
 
 
@@ -103,7 +113,7 @@ def load_photo_metadata():
                         "SELECT FOTOGRAMA_TIFF, FECHA, HORA, LAT_ETRS89, LONG_ETRS89 "  # noqa
                         "FROM VueloEjecutado"  # noqa
                     ).fetchall(),
-                    columns=["file", "date", "time", "photo_latitude", "photo_longitude"]
+                    columns=["photo_file", "date", "time", "photo_latitude", "photo_longitude"]
                 )
 
                 # There is a mixture of datetime objects and strings. Format them all as strings
@@ -134,7 +144,7 @@ def load_photo_metadata():
             print(f"Skipping {database_file} because the query failed.")
     photos = (
         pd.concat(photo_list)
-        .sort_values("file")
+        .sort_values("photo_file")
         .assign(
             geometry=lambda x: gpd.points_from_xy(
                 x.photo_longitude, x.photo_latitude, crs="ETRS89"
