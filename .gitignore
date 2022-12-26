@@ -1,7 +1,7 @@
 *checkpoint.ipynb
 venv/
+yolov7_venv/
 data
-packages
 .vscode/
 .idea/
 debug.log
