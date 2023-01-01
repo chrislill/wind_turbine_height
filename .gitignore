@@ -1,7 +1,10 @@
 *checkpoint.ipynb
+data/
+runs/
+wandb/
 venv/
 yolov7_venv/
-data
+
 .vscode/
 .idea/
 debug.log
