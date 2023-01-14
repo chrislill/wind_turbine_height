@@ -14,7 +14,7 @@ def main():
     # least 640 wide and include 10px of padding. We will use roboflow to resize
     # them to 640px (or smaller)
     output_size = 640
-    data_version = os.getenv("raw_label_version")
+    data_version = os.getenv("labelled_sites_version")
 
     # for dataset in ["train", "valid", "test"]:
     for dataset in ["valid"]:
