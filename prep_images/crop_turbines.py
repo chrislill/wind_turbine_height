@@ -49,6 +49,7 @@ def main():
                 center_y_px=lambda x: (x.center_y * x.src_height).astype(int),
                 width_px=lambda x: (x.width * x.src_width).astype(int),
                 height_px=lambda x: (x.height * x.src_height).astype(int),
+                # TODO: Handle overlaps for multiple turbines in a cropped image
                 max_size=lambda x: (
                     (x[["width_px", "height_px"]] + 20).assign(size=output_size).max(axis=1)
                 ),
