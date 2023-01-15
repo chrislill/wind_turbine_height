@@ -10,6 +10,6 @@ yolov7_venv/
 debug.log
 *.csv
 .env.secret
-notebooks/de421.bsp
+de421.bsp
 traced_model.pt
 
