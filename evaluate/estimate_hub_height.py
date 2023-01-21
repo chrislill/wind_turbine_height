@@ -47,17 +47,21 @@ def main():
             sep=" ",
             names=["label", "center_x", "center_y", "width", "height"],
         )
-        if labels.label.eq(0).sum() >= 1:
+        if labels.label.eq(0).sum() >= 1 and labels.label.eq(1).sum() >= 1:
             base_x, base_y = labels.query("label == 0").iloc[0, 1:3].values
-        else:
-            base_x, base_y = None
-        if labels.label.eq(0).sum() >= 1:
             hub_x, hub_y = labels.query("label == 1").iloc[0, 1:3].values
         else:
-            hub_x, hub_y = None
+            turbine_list.append(
+                {
+                    "site": site,
+                    "turbine_num": turbine_num,
+                    "actual_hub_height": actual_hub_height,
+                }
+            )
+            continue
 
         # Calculate shadow length and sun azimuth from labels (compass heading of the shadow)
-        image_path = Path(f"data/turbine_images/test/{site}_{turbine_num}.png")
+        image_path = next(Path("data/turbine_images").glob(f"**/{site}_{turbine_num}.png"))
         image = gdal.Open(str(image_path))
         x_distance = (base_x - hub_x) * image.RasterXSize * resolution
         y_distance = (base_y - hub_y) * image.RasterYSize * resolution
@@ -77,13 +81,6 @@ def main():
         altitude, azimuth, _ = observer.at(time).observe(sun).apparent().altaz()
         estimated_hub_height = math.tan(altitude.radians) * shadow_length
 
-        # Check that the azimuth of the sun matches the shadow
-        # if abs(shadow_azimuth - azimuth.degrees) > 5:
-        #     raise ValueError(
-        #         f"Shadow azimuth {shadow_azimuth:.0f} does not match "
-        #         f"sun azimuth {azimuth.degrees:.0f}"
-        #     )
-
         turbine_list.append(
             {
                 "site": site,
@@ -91,15 +88,23 @@ def main():
                 "estimated_hub_height": round(estimated_hub_height, 1),
                 "actual_hub_height": actual_hub_height,
                 "hub_height_diff": round(estimated_hub_height, 1) - actual_hub_height,
+                "azimuth_diff": abs(int(shadow_azimuth) - int(azimuth.degrees)),
                 "shadow_azimuth": int(shadow_azimuth),
                 "azimuth": int(azimuth.degrees),
-                "azimuth_diff": abs(int(int(shadow_azimuth) - int(azimuth.degrees))),
                 "shadow_length": round(shadow_length, 1),
                 "altitude": round(altitude.degrees, 1),
             }
         )
 
     turbines = pd.DataFrame(turbine_list)
+    good_turbines = turbines[turbines.azimuth_diff.le(5) & ~turbines.actual_hub_height.isna()]
+    good_sites = good_turbines.groupby("site").agg({
+        "turbine_num": "count",
+        "actual_hub_height": "mean",
+        "estimated_hub_height": "mean",
+        "hub_height_diff": "mean",
+    }).sort_values("hub_height_diff")
+
     print("Done")
 
 
