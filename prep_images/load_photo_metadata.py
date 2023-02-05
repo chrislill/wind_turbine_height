@@ -111,6 +111,11 @@ def main():
             ],
         ]
     )
+
+    # Load old sites, so that we can identify the new images to be labelled
+    old_sites = pd.read_csv("data/site_photo_metadata.csv")
+    site_photos["new"] = ~site_photos.site.isin(old_sites.site)
+
     site_photos.to_csv("data/site_photo_metadata.csv", index=False)
     print("Done")
 
