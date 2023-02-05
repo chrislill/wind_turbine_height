@@ -4,6 +4,7 @@ runs/
 wandb/
 venv/
 yolov7_venv/
+turbine_shadow/
 
 .vscode/
 .idea/
@@ -12,4 +13,5 @@ debug.log
 .env.secret
 de421.bsp
 traced_model.pt
+
 
