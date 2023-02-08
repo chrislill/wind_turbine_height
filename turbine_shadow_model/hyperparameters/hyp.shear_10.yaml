@@ -20,7 +20,7 @@ hsv_v: 0.0  # image HSV-Value augmentation (fraction)
 degrees: 0.0  # image rotation (+/- deg)
 translate: 0.0  # image translation (+/- fraction)
 scale: 0.0  # image scale (+/- gain)
-shear: 20.0  # image shear (+/- deg)
+shear: 10.0  # image shear (+/- deg)
 perspective: 0.0  # image perspective (+/- fraction), range 0-0.001
 flipud: 0.0  # image flip up-down (probability)
 fliplr: 0.5  # image flip left-right (probability)
