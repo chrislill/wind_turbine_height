@@ -5,7 +5,7 @@ SET data=v013
 SET yolo_path=%USERPROFILE%/Code/yolov7
 :: SET weights_path=%yolo_path%/weights/yolov7_training.pt
 SET weights_path=.\runs\train\%baseline%%run%\weights\best.pt
-SET hyp_path=hyp.scratch.custom.yaml
+SET hyp_path=hyperparameters\hyp.scratch.custom.yaml
 :: SET hyp_path=hyp.no_shear.yaml
 
 CALL CD %USERPROFILE%\Code\wind_turbine_height\turbine_shadow_model
