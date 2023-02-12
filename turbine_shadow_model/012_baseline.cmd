@@ -11,4 +11,4 @@ SET hyp_path=hyp.scratch.custom.yaml
 CALL CD %USERPROFILE%\Code\wind_turbine_height\turbine_shadow_model
 CALL ..\yolov7_venv\scripts\activate
 CALL wandb disabled
-CALL python %yolo_path%/train.py --epochs 300 --img-size 640 --batch 4 --workers 4 --cfg %yolo_path%/cfg/training/yolov7.yaml --hyp %hyp_path% --data ../data/turbine_shadow_data/%data%/data.yaml --weights %weights_path% --device 0 --name %experiment%
+CALL python %yolo_path%/train.py --epochs 200 --img-size 640 --batch 4 --workers 4 --cfg %yolo_path%/cfg/training/yolov7.yaml --hyp %hyp_path% --data ../data/turbine_shadow_data/%data%/data.yaml --weights %weights_path% --device 0 --name %experiment%
