@@ -1,4 +1,5 @@
-SET experiment=019_evolve
+:: Do a 400 epoch evolve hyperparameter tuning session
+SET experiment=020_evolve
 SET baseline=009_4_tiles
 SET run=3
 SET data=v013
