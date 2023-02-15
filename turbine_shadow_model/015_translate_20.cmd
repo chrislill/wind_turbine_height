@@ -1,4 +1,4 @@
-SET experiment=018_mixup_50
+SET experiment=015_translate_20
 SET baseline=009_4_tiles
 SET run=3
 SET data=v013
@@ -6,7 +6,7 @@ SET yolo_path=%USERPROFILE%/Code/yolov7
 :: SET weights_path=%yolo_path%/weights/yolov7_training.pt
 SET weights_path=.\runs\train\%baseline%%run%\weights\best.pt
 :: SET weights_path=.\runs\train\%experiment%\weights\last.pt
-SET hyp_path=hyperparameters\hyp.mixup_50.yaml
+SET hyp_path=hyperparameters\hyp.translate_20.yaml
 :: SET hyp_path=hyp.no_shear.yaml
 
 CALL CD %USERPROFILE%\Code\wind_turbine_height\turbine_shadow_model
