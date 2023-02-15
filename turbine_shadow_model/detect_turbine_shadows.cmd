@@ -10,4 +10,4 @@ SET image_path=..\data\turbine_shadow_data\active_learning\test\images
 
 CALL CD %USERPROFILE%\Code\wind_turbine_height\turbine_shadow_model
 CALL ..\yolov7_venv\scripts\activate
-CALL python %yolo_path%/detect.py --conf 0.60 --weights %weights_path% --source %image_path%
+CALL python %yolo_path%/detect.py --conf 0.50 --weights %weights_path% --source %image_path%
