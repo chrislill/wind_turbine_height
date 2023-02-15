@@ -1,7 +1,7 @@
 :: Run the model with evolved data centric hyperparameters
 SET experiment=020_evolved_hyperparameters
 SET baseline=009_4_tiles
-SET run=4
+SET run=3
 SET data=v013
 SET yolo_path=%USERPROFILE%/Code/yolov7
 :: SET weights_path=%yolo_path%/weights/yolov7_training.pt
