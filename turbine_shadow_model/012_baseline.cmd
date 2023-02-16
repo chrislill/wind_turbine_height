@@ -3,7 +3,7 @@ SET baseline=009_4_tiles
 SET run=3
 SET data=v013
 SET yolo_path=%USERPROFILE%/Code/yolov7
-SET hyp_path=hyperparameters\hyp.no_modifications.yaml
+SET hyp_path=hyperparameters\hyp.default.yaml
 
 SET weights_path=.\runs\train\%baseline%%run%\weights\best.pt
 :: SET weights_path=.\runs\train\%experiment%\weights\last.pt
