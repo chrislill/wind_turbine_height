@@ -1,4 +1,4 @@
-SET experiment=021_active_learning
+SET experiment=016_active_learning
 SET baseline=009_4_tiles
 SET run=3
 SET data=v013_active
