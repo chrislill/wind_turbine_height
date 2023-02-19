@@ -1,6 +1,6 @@
-SET experiment=001_initial_model
-SET run=7
-SET data=v001
+SET experiment=002_baseline
+SET run=
+SET data=v002
 SET yolo_path=%USERPROFILE%/Code/yolov7
 SET weights_path=.\runs\train\%experiment%%run%\weights\best.pt
 
