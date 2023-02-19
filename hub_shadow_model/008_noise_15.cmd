@@ -1,7 +1,7 @@
-SET experiment=006_noise_05
+SET experiment=008_noise_15
 SET baseline=001_initial_model
 SET run=5
-SET data=v003
+SET data=v005
 SET yolo_path=%USERPROFILE%/Code/yolov7
 SET hyp_path=hyperparameters\hyp.default.yaml
 
