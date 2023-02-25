@@ -1,9 +1,9 @@
-SET experiment=018_remove_mosaic
+SET experiment=017_all_labels
 SET baseline=001_initial_model
 SET run=5
-SET data=v004_all_labels
+SET data=v002_all_labels
 SET yolo_path=%USERPROFILE%/Code/yolov7
-SET hyp_path=hyperparameters\hyp.no_mosaic.yaml
+SET hyp_path=hyperparameters\hyp.default.yaml
 
 SET weights_path=.\runs\train\%baseline%%run%\weights\best.pt
 :: SET weights_path=.\runs\train\%experiment%\weights\last.pt
