@@ -47,6 +47,7 @@ def main(run_name):
         )
         turbine_metadata = {
             "site": site,
+            "turbine_id": turbine_num,
             "actual_hub_height": actual_hub_height,
             "num_bases": labels.label.eq(0).sum(),
             "num_hub_shadows": labels.label.eq(1).sum()
@@ -62,7 +63,13 @@ def main(run_name):
             continue
 
         # Calculate shadow length and sun azimuth from labels (compass heading of the shadow)
-        image_path = next(Path("data/turbine_images").glob(f"**/{site}_{turbine_num}.png"))
+        try:
+            image_path = next(Path("data/turbine_images").glob(f"**/{site}_{turbine_num}.png"))
+        except StopIteration:
+            # Images have been removed from dataset (example Almendarache)
+            turbine_list.append(turbine_metadata)
+            continue
+
         image = gdal.Open(str(image_path))
         x_distance = (base_x - hub_x) * image.RasterXSize * resolution
         y_distance = (base_y - hub_y) * image.RasterYSize * resolution
@@ -126,7 +133,7 @@ def main(run_name):
         )
         .assign(num_turbines=lambda x: x.iloc[:, -4:].sum(axis=1))
     )
-    turbines.to_csv(f"data/{run_name}_turbine_predictions.csv")
+    turbines.to_csv(f"data/{run_name}_turbine_predictions.csv", index=False)
     site_results.to_csv(f"data/{run_name}_site_predictions.csv")
 
 
