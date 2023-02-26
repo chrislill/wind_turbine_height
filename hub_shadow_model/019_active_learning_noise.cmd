@@ -1,4 +1,4 @@
-SET experiment=019_remove_mosaic
+SET experiment=019_active_learning_noise
 SET baseline=001_initial_model
 SET run=5
 SET data=v004_all_labels

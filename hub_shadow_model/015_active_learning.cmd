@@ -1,4 +1,4 @@
-SET experiment=002_baseline
+SET experiment=015_active_learning
 SET baseline=001_initial_model
 SET run=5
 SET data=v002_active_learning
