@@ -11,4 +11,4 @@ SET image_path=..\data\hub_shadow_data\%data%\test\images
 CALL CD %USERPROFILE%\Code\wind_turbine_height\hub_height_model
 CALL ..\yolov7_venv\scripts\activate
 CALL wandb disabled
-CALL python %yolo_path%/detect.py --conf 0.50 --weights %weights_path% --source %image_path%
+CALL python %yolo_path%/detect.py --conf 0.50 --weights %weights_path% --source %image_path% --save-txt --save-conf
