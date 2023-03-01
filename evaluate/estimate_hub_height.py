@@ -1,14 +1,14 @@
 from datetime import datetime
 import math
-import os
 from pathlib import Path
 import re
 
 import dotenv
 import numpy as np
 import pandas as pd
-from skyfield import api as skyfield_api
 from osgeo import gdal  # noqa
+from scipy import stats
+from skyfield import api as skyfield_api
 
 
 def main(run_name):
@@ -136,7 +136,19 @@ def main(run_name):
     turbines.to_csv(f"data/{run_name}_turbine_predictions.csv", index=False)
     site_results.to_csv(f"data/{run_name}_site_predictions.csv")
 
+    # Carry out a one sample, two-tailed t-test
+    # Null hypothesis: Error < -5m or Error > 5m
+    _, p_lower = stats.ttest_1samp(
+        site_results.hub_height_diff, -5, nan_policy="omit", alternative="greater"
+    )
+    _, p_upper = stats.ttest_1samp(
+        site_results.hub_height_diff, 5, nan_policy="omit", alternative="less"
+    )
+    p_value = p_lower + p_upper
+    summary = f"P-value: {p_value:.3f}\nP-lower: {p_lower:.3f}\nP-upper: {p_upper:.3f}"
+    print(summary)
+    print("End")
 
 if __name__ == "__main__":
-    main("train")
-    # main("test")
+    # main("train")
+    main("test")
