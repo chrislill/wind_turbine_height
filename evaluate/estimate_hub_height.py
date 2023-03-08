@@ -33,12 +33,23 @@ def main(run_name):
         resolution = orthophotos.query(f"site=='{site}'").resolution.iloc[0]
         site_metadata = sites[sites.site.eq(site)].iloc[0]
 
-        # TODO: Handle multiple hub heights
+        # Drop Ourol because the site co-ordinates are wrong
+        if site == "ourol":
+            continue
+
+        # Only Becerril has turbines listed with different heights
         hub_heights = hub_height_regex.findall(site_metadata.hub_height)
-        if len(hub_heights) >= 1:
-            actual_hub_height = float(hub_heights[0])
-        else:
+        if len(hub_heights) == 0:
             actual_hub_height = np.nan
+        elif len(hub_heights) == 1 or hub_heights[0] == hub_heights[1]:
+            actual_hub_height = float(hub_heights[0])
+        elif len(hub_heights) > 1:
+            turbine_counts = hub_height_regex.findall(site_metadata.num_turbines)
+            actual_hub_height = np.average(
+                [float(h) for h in hub_heights], weights=[float(c) for c in turbine_counts]
+            )
+        else:
+            raise ValueError("Unable to calculate hub height")
 
         labels = pd.read_csv(
             label_path,
@@ -66,7 +77,7 @@ def main(run_name):
         try:
             image_path = next(Path("data/turbine_images").glob(f"**/{site}_{turbine_num}.png"))
         except StopIteration:
-            # Images have been removed from dataset (example Almendarache)
+            # Images have been removed from dataset (example Almendarache)  # noqa
             turbine_list.append(turbine_metadata)
             continue
 
@@ -96,8 +107,8 @@ def main(run_name):
                 "estimated_hub_height": estimated_hub_height,
                 "hub_height_diff": estimated_hub_height - actual_hub_height,
                 "azimuth_diff": abs(int(shadow_azimuth) - int(azimuth.degrees)),
-                "shadow_azimuth": int(shadow_azimuth),
-                "azimuth": int(azimuth.degrees),
+                "shadow_azimuth": round(shadow_azimuth, 1),
+                "azimuth": round(azimuth.degrees, 1),
                 "shadow_length": round(shadow_length, 1),
                 "altitude": round(altitude.degrees, 1),
             }
@@ -148,6 +159,7 @@ def main(run_name):
     summary = f"P-value: {p_value:.3f}\nP-lower: {p_lower:.3f}\nP-upper: {p_upper:.3f}"
     print(summary)
     print("End")
+
 
 if __name__ == "__main__":
     # main("train")
