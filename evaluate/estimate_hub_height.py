@@ -4,6 +4,7 @@ from pathlib import Path
 import re
 
 import dotenv
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from osgeo import gdal  # noqa
@@ -61,7 +62,7 @@ def main(run_name):
             "turbine_id": turbine_num,
             "actual_hub_height": actual_hub_height,
             "num_bases": labels.label.eq(0).sum(),
-            "num_hub_shadows": labels.label.eq(1).sum()
+            "num_hub_shadows": labels.label.eq(1).sum(),
         }
 
         # The predicted labels are listed in order of confidence
@@ -101,8 +102,8 @@ def main(run_name):
         estimated_hub_height = round(math.tan(altitude.radians) * shadow_length, 1)
 
         turbine_list.append(
-            turbine_metadata |
-            {
+            turbine_metadata
+            | {
                 "actual_hub_height": actual_hub_height,
                 "estimated_hub_height": estimated_hub_height,
                 "hub_height_diff": estimated_hub_height - actual_hub_height,
@@ -120,32 +121,45 @@ def main(run_name):
         azimuth_mismatch=lambda x: x.azimuth_diff.gt(10) & ~x.multiple_labels,
         good_estimate=lambda x: (
             ~x[["missing_labels", "multiple_labels", "azimuth_mismatch"]].any(axis=1)
-        )
+        ),
     )
     site_results = (
         turbines[turbines.good_estimate]
         .groupby("site")
-        .agg({
-            "actual_hub_height": "mean",
-            "estimated_hub_height": "mean",
-            "hub_height_diff": "mean",
-            "altitude": "count"
-        })
+        .agg(
+            {
+                "actual_hub_height": "mean",
+                "estimated_hub_height": "mean",
+                "hub_height_diff": "mean",
+                "altitude": "count",
+            }
+        )
         .rename(columns={"altitude": "valid_estimates"})
         .join(
             turbines[~turbines.good_estimate]
             .groupby("site")
-            .agg({
-                "missing_labels": "sum",
-                "multiple_labels": "sum",
-                "azimuth_mismatch": "sum"
-            }),
-            how="outer"
+            .agg({"missing_labels": "sum", "multiple_labels": "sum", "azimuth_mismatch": "sum"}),
+            how="outer",
         )
         .assign(num_turbines=lambda x: x.iloc[:, -4:].sum(axis=1))
     )
-    turbines.to_csv(f"data/{run_name}_turbine_predictions.csv", index=False)
-    site_results.to_csv(f"data/{run_name}_site_predictions.csv")
+    # turbines.to_csv(f"data/{run_name}_turbine_predictions.csv", index=False)
+    # site_results.to_csv(f"data/{run_name}_site_predictions.csv")
+
+    # Plot histogram of hub height errors, using bins of 2m width
+    fig, ax = plt.subplots(figsize=(6, 4))
+    bins = range(
+        (round(site_results.hub_height_diff.min() / 2) * 2) - 1,
+        (round(site_results.hub_height_diff.max() / 2) * 2) + 3,
+        2
+    )
+    site_results.hub_height_diff.plot.hist(bins=bins, ax=ax, label="_remove")
+    ax.set_xlabel(f"Hub height errors in the {run_name}ing set (m)")
+    ax.axvline(-5, color="green", linestyle="dotted", label="Required accuracy of 5m")
+    ax.axvline(5, color="green", linestyle="dotted")
+    fig.tight_layout()
+    ax.legend()
+    fig.savefig(f"data/plots/{run_name}_hub_height_errors.png")
 
     # Carry out a one sample, two-tailed t-test
     # Null hypothesis: Error < -5m or Error > 5m
@@ -156,11 +170,12 @@ def main(run_name):
         site_results.hub_height_diff, 5, nan_policy="omit", alternative="less"
     )
     p_value = p_lower + p_upper
-    summary = f"P-value: {p_value:.3f}\nP-lower: {p_lower:.3f}\nP-upper: {p_upper:.3f}"
+    summary = f"{run_name} P-value: {p_value:.3f}\nP-lower: {p_lower:.3f}\nP-upper: {p_upper:.3f}"
     print(summary)
+    print(stats.shapiro(site_results.hub_height_diff.dropna()))
     print("End")
 
 
 if __name__ == "__main__":
-    # main("train")
+    main("train")
     main("test")
