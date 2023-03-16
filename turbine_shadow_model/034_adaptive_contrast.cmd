@@ -1,7 +1,7 @@
-SET experiment=033_histogram_contrast
+SET experiment=034_adaptive_contrast
 SET baseline=009_4_tiles
 SET run=3
-SET data=v024
+SET data=v025
 SET yolo_path=%USERPROFILE%/Code/yolov7
 SET weights_path=.\runs\train\%baseline%%run%\weights\best.pt
 SET hyp_path=hyperparameters\hyp.default.yaml
