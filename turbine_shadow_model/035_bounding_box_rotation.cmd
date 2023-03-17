@@ -1,7 +1,7 @@
 SET experiment=035_bounding_box_rotation
 SET baseline=009_4_tiles
 SET run=3
-SET data=v023
+SET data=v026
 SET yolo_path=%USERPROFILE%/Code/yolov7
 SET weights_path=.\runs\train\%baseline%%run%\weights\best.pt
 SET hyp_path=hyperparameters\hyp.default.yaml
