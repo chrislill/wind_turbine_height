@@ -1,9 +1,9 @@
-SET experiment=023_active_learning_paste
+SET experiment=031_paste_in_20
 SET baseline=001_initial_model
 SET run=5
-SET data=v002_active_learning
+SET data=v002
 SET yolo_path=%USERPROFILE%/Code/yolov7
-SET hyp_path=hyperparameters\hyp.paste_in_10.yaml
+SET hyp_path=hyperparameters\hyp.paste_in_20.yaml
 
 SET weights_path=.\runs\train\%baseline%%run%\weights\best.pt
 :: SET weights_path=.\runs\train\%experiment%\weights\last.pt
