@@ -19,7 +19,6 @@ def main():
 
     turbine_list = []
     for dataset in ["train", "valid", "test"]:
-    # for dataset in ["valid"]:
         image_paths = Path(f"data/turbine_shadow_data/{full_labels}/{dataset}/images").glob("*")
         os.makedirs(f"data/turbine_images/{dataset}", exist_ok=True)
         for image_path in image_paths:
