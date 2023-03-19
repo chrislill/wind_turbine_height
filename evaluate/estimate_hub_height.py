@@ -29,17 +29,19 @@ def main(run_name):
     ephemeris = skyfield_api.load("de421.bsp")
     earth, sun = ephemeris["earth"], ephemeris["sun"]
 
-    # Load aerial phot data to find the nearest photo for each turbine
+    # Load aerial photo data to find the nearest photo for each turbine
     photo_metadata = load_photo_metadata()
+    transformer_to_30n = Transformer.from_crs(f"EPSG:4326", f"EPSG:25830")
 
     # Load elevation metadata from Informacion_auxiliar_LIDAR_2_cobertura.zip
-    # elevation_metadata = gpd.read_file(
-    #     "data/digital_elevation/coverage/lidar_segunda_cobertura.shp"  # noqa
-    # ).set_geometry("geometry", drop=True)  # .assign(tile_centroid=lambda x: x.geometry.centroid)
+    elevation_metadata = gpd.read_file(
+        "data/digital_elevation/coverage/MDT05.shp"  # noqa
+    ).set_geometry("geometry", drop=True)  # .assign(tile_centroid=lambda x: x.geometry.centroid)
 
     turbine_regex = re.compile(r"_(\d+)_")
     hub_height_regex = re.compile(r"([0-9]*[.]?[0-9]+)")
     turbine_list = []
+    file_list = []
     for label_path in label_paths:
         name_split = turbine_regex.split(label_path.name)
         site = name_split[0]
@@ -47,9 +49,9 @@ def main(run_name):
         turbine = turbines.query("site == @site and turbine_num == @turbine_num").iloc[0]
         site_metadata = sites[sites.site.eq(site)].iloc[0]
 
-        # Drop Ourol because the co-ordinates are for the wrong site with an
+        # Drop Ourol and Xiabre because the co-ordinates are for the wrong site with an
         # unknown hub height.
-        if site == ["ourol", "xiabre"]:
+        if site in ["ourol", "xiabre"]:
             continue
 
         # Only Becerril has turbines listed with different heights
@@ -115,8 +117,7 @@ def main(run_name):
         )
 
         # Find the timestamp for the nearest aerial photo
-        transformer = Transformer.from_crs(f"EPSG:4326", f"EPSG:25830")
-        point_x, point_y = transformer.transform(base_latitude, base_longitude)
+        point_x, point_y = transformer_to_30n.transform(base_latitude, base_longitude)
         turbine_point = Point(point_x, point_y)
         area_around_turbine = turbine_point.buffer(3100)
         nearest_photo = (
@@ -139,8 +140,13 @@ def main(run_name):
         shadow_height = math.tan(altitude.radians) * shadow_length, 1
 
         # Include topology correction
-        # correction = topology_correction(site, image, (base_x, base_y), (hub_x, hub_y))
-        # estimated_hub_height = round(shadow_height[0] - correction, 1)
+        base_height = get_elevation(turbine_point, elevation_metadata)
+        hub_point = Point(transformer_to_30n.transform(base_latitude, base_longitude))
+        hub_shadow_height = get_elevation(hub_point, elevation_metadata)
+        file_list.append(base_height)
+        file_list.append(hub_shadow_height)
+        # height_correction = base_height - hub_shadow_height
+        # estimated_hub_height = round(shadow_height[0] - height_correction, 1)
         estimated_hub_height = shadow_height[0]
 
         turbine_list.append(
@@ -158,9 +164,14 @@ def main(run_name):
                 "base_longitude": round(base_longitude, 6),
                 "hub_latitude": round(hub_latitude, 6),
                 "hub_longitude": round(hub_longitude, 6),
+                # "base_height": round(base_height, 1),
+                # "hub_shadow_height": round(hub_shadow_height, 1),
+                # "height_correction": round(height_correction, 1),
                 "photo_file": nearest_photo.photo_file,
             }
         )
+    files = sorted(set(file_list))
+    pd.Series(files).to_csv(f"data/digital_elevation/{run_name}_dsm_files.csv")
 
     turbines = pd.DataFrame(turbine_list).assign(
         missing_labels=lambda x: x.num_bases.eq(0) | x.num_hub_shadows.eq(0),
@@ -233,20 +244,24 @@ def calculate_coordinates(object_x, object_y, turbine, zone):
     return latitude, longitude
 
 
-def topology_correction(site, image, base_coords, hub_coords):
+def get_elevation(point, elevation_metadata):
     """
 
-    :param site:
-    :param image:
-    :param base_coords:
-    :param hub_coords:
-    :return:
+    :param point:
+    :param elevation_metadata:
+    :return: height
     """
-
-    return 1
+    elevation_tiles = (
+        elevation_metadata[elevation_metadata.contains(point)]
+        .assign(distance_to_centroid=lambda x: x.distance(point))
+        .sort_values("distance_to_centroid")
+    )
+    if len(elevation_tiles) == 0:
+        return None
+    else:
+        return elevation_tiles.FICHERO.iloc[0]
 
 
 if __name__ == "__main__":
     main("test")
     main("train")
-
