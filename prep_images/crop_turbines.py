@@ -39,7 +39,8 @@ def main():
                                 "resolution": orthophoto.resolution,
                                 "site_corner_x": orthophoto.corner_x,
                                 "site_corner_y": orthophoto.corner_y,
-                                "image_file": image_path.name
+                                "image_file": image_path.name,
+                                "zone": orthophoto.zone
                             },
                             index=[0],
                         ),

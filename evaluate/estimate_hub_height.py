@@ -1,15 +1,20 @@
 from datetime import datetime
 import math
+import os
 from pathlib import Path
 import re
 
 import dotenv
 import matplotlib.pyplot as plt
+import geopandas as gpd
 import numpy as np
 import pandas as pd
+from pyproj import Transformer
 from osgeo import gdal  # noqa
 from scipy import stats
+from shapely.geometry import Point
 from skyfield import api as skyfield_api
+from prep_images.load_photo_metadata import load_photo_metadata
 
 
 def main(run_name):
@@ -17,25 +22,34 @@ def main(run_name):
     dotenv.load_dotenv(".env.secret")
 
     sites = pd.read_csv("data/site_photo_metadata.csv")
-    orthophotos = pd.read_csv("data/orthophoto_metadata.csv")
+    turbines = pd.read_csv("data/turbine_image_metadata.csv")
     label_paths = Path(f"hub_shadow_model/runs/detect/{run_name}/labels").glob("*")
 
     # Set up skyfield to calculate relative positions of the earth and sun
     ephemeris = skyfield_api.load("de421.bsp")
     earth, sun = ephemeris["earth"], ephemeris["sun"]
 
-    turbine_list = []
+    # Load aerial phot data to find the nearest photo for each turbine
+    photo_metadata = load_photo_metadata()
+
+    # Load elevation metadata from Informacion_auxiliar_LIDAR_2_cobertura.zip
+    # elevation_metadata = gpd.read_file(
+    #     "data/digital_elevation/coverage/lidar_segunda_cobertura.shp"  # noqa
+    # ).set_geometry("geometry", drop=True)  # .assign(tile_centroid=lambda x: x.geometry.centroid)
+
     turbine_regex = re.compile(r"_(\d+)_")
     hub_height_regex = re.compile(r"([0-9]*[.]?[0-9]+)")
+    turbine_list = []
     for label_path in label_paths:
         name_split = turbine_regex.split(label_path.name)
         site = name_split[0]
         turbine_num = int(name_split[1])
-        resolution = orthophotos.query(f"site=='{site}'").resolution.iloc[0]
+        turbine = turbines.query("site == @site and turbine_num == @turbine_num").iloc[0]
         site_metadata = sites[sites.site.eq(site)].iloc[0]
 
-        # Drop Ourol because the site co-ordinates are wrong
-        if site == "ourol":
+        # Drop Ourol because the co-ordinates are for the wrong site with an
+        # unknown hub height.
+        if site == ["ourol", "xiabre"]:
             continue
 
         # Only Becerril has turbines listed with different heights
@@ -82,24 +96,52 @@ def main(run_name):
             turbine_list.append(turbine_metadata)
             continue
 
+        # Calculate label positions within the image
         image = gdal.Open(str(image_path))
-        x_distance = (base_x - hub_x) * image.RasterXSize * resolution
-        y_distance = (base_y - hub_y) * image.RasterYSize * resolution
+        x_distance = (base_x - hub_x) * image.RasterXSize * turbine.resolution
+        y_distance = (base_y - hub_y) * image.RasterYSize * turbine.resolution
         shadow_length = (x_distance**2 + y_distance**2) ** 0.5
         if x_distance >= 0:
             shadow_azimuth = 90 + math.atan(y_distance / x_distance) * 180 / math.pi
         else:
             shadow_azimuth = 270 + math.atan(y_distance / x_distance) * 180 / math.pi
 
+        # Calculate label latitude and longitude
+        base_latitude, base_longitude = calculate_coordinates(
+            base_x, base_y, turbine, site_metadata.HUSO
+        )
+        hub_latitude, hub_longitude = calculate_coordinates(
+            hub_x, hub_y, turbine, site_metadata.HUSO
+        )
+
+        # Find the timestamp for the nearest aerial photo
+        transformer = Transformer.from_crs(f"EPSG:4326", f"EPSG:25830")
+        point_x, point_y = transformer.transform(base_latitude, base_longitude)
+        turbine_point = Point(point_x, point_y)
+        area_around_turbine = turbine_point.buffer(3100)
+        nearest_photo = (
+            photo_metadata[photo_metadata.within(area_around_turbine)]
+            .assign(distance_to_centroid=lambda x: x.distance(turbine_point))
+            .sort_values("distance_to_centroid")
+        )
+        if nearest_photo.shape[0] > 0:
+            nearest_photo = nearest_photo.iloc[0]
+        else:
+            turbine_list.append(turbine_metadata)
+            continue
+
         # Calculate the sun altitude and azimuth from the timestamp
         observer = earth + skyfield_api.wgs84.latlon(
-            latitude_degrees=site_metadata.latitude, longitude_degrees=site_metadata.longitude
+            latitude_degrees=base_latitude, longitude_degrees=base_longitude
         )
-        time = skyfield_api.load.timescale().from_datetime(
-            datetime.fromisoformat(site_metadata.photo_timestamp)
-        )
+        time = skyfield_api.load.timescale().from_datetime(nearest_photo.photo_timestamp)
         altitude, azimuth, _ = observer.at(time).observe(sun).apparent().altaz()
-        estimated_hub_height = round(math.tan(altitude.radians) * shadow_length, 1)
+        shadow_height = math.tan(altitude.radians) * shadow_length, 1
+
+        # Include topology correction
+        # correction = topology_correction(site, image, (base_x, base_y), (hub_x, hub_y))
+        # estimated_hub_height = round(shadow_height[0] - correction, 1)
+        estimated_hub_height = shadow_height[0]
 
         turbine_list.append(
             turbine_metadata
@@ -112,6 +154,11 @@ def main(run_name):
                 "azimuth": round(azimuth.degrees, 1),
                 "shadow_length": round(shadow_length, 1),
                 "altitude": round(altitude.degrees, 1),
+                "base_latitude": round(base_latitude, 6),
+                "base_longitude": round(base_longitude, 6),
+                "hub_latitude": round(hub_latitude, 6),
+                "hub_longitude": round(hub_longitude, 6),
+                "photo_file": nearest_photo.photo_file,
             }
         )
 
@@ -143,15 +190,15 @@ def main(run_name):
         )
         .assign(num_turbines=lambda x: x.iloc[:, -4:].sum(axis=1))
     )
-    # turbines.to_csv(f"data/{run_name}_turbine_predictions.csv", index=False)
-    # site_results.to_csv(f"data/{run_name}_site_predictions.csv")
+    turbines.to_csv(f"data/{run_name}_turbine_predictions.csv", index=False)
+    site_results.to_csv(f"data/{run_name}_site_predictions.csv")
 
     # Plot histogram of hub height errors, using bins of 2m width
     fig, ax = plt.subplots(figsize=(6, 4))
     bins = range(
         (round(site_results.hub_height_diff.min() / 2) * 2) - 1,
         (round(site_results.hub_height_diff.max() / 2) * 2) + 3,
-        2
+        2,
     )
     site_results.hub_height_diff.plot.hist(bins=bins, ax=ax, label="_remove")
     ax.set_xlabel(f"Hub height errors in the {run_name}ing set (m)")
@@ -176,6 +223,30 @@ def main(run_name):
     print("End")
 
 
+def calculate_coordinates(object_x, object_y, turbine, zone):
+    x_coordinate = turbine.turbine_corner_x + (object_x * turbine.resolution * turbine.max_size)
+    y_coordinate = turbine.turbine_corner_y - (object_y * turbine.resolution * turbine.max_size)
+
+    transformer = Transformer.from_crs(f"EPSG:258{zone}", "EPSG:4326")
+    latitude, longitude = transformer.transform(x_coordinate, y_coordinate)
+
+    return latitude, longitude
+
+
+def topology_correction(site, image, base_coords, hub_coords):
+    """
+
+    :param site:
+    :param image:
+    :param base_coords:
+    :param hub_coords:
+    :return:
+    """
+
+    return 1
+
+
 if __name__ == "__main__":
-    main("train")
     main("test")
+    main("train")
+

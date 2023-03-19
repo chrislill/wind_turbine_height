@@ -59,8 +59,9 @@ def main():
                 "site": site.site,
                 "name": site.orthophoto_name,
                 "resolution": resolution,
-                "corner_x": source_info["geoTransform"][0],
-                "corner_y": source_info["geoTransform"][3],
+                "zone": site.orthophoto_name[20:22],
+                "corner_x": site.site_x - 1000,
+                "corner_y": site.site_y + 1000,
             }
         )
     orthophoto_metadata = pd.DataFrame(orthophoto_list)

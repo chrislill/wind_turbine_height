@@ -55,6 +55,7 @@ jupyter
 notebook-as-pdf
 pandas
 pyodbc
+pyproj
 python-dotenv
 scikit-learn
 seaborn

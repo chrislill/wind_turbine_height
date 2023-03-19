@@ -108,6 +108,7 @@ def main():
                 "orthophoto_name",
                 "site_x",
                 "site_y",
+                "HUSO"
             ],
         ]
     )
