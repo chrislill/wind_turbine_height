@@ -1,6 +1,4 @@
-from datetime import datetime
 import math
-import os
 from pathlib import Path
 import re
 
@@ -12,6 +10,7 @@ import pandas as pd
 from pyproj import Transformer
 from osgeo import gdal  # noqa
 from scipy import stats
+from scipy.interpolate import RegularGridInterpolator
 from shapely.geometry import Point
 from skyfield import api as skyfield_api
 from prep_images.load_photo_metadata import load_photo_metadata
@@ -258,8 +257,32 @@ def get_elevation(point, elevation_metadata):
     )
     if len(elevation_tiles) == 0:
         return None
-    else:
-        return elevation_tiles.FICHERO.iloc[0]
+    try:
+        elevation = pd.read_csv(
+            f"data/digital_elevation/files/{elevation_tiles.FICHERO.iloc[0]}",
+            skiprows=6,
+            skipfooter=1,
+            header=None,
+            sep=" ",
+            engine="python"
+        ).iloc[:, :-1]
+        metadata = pd.read_csv(
+            f"data/digital_elevation/files/{elevation_tiles.FICHERO.iloc[0]}",
+            header=None,
+            skipfooter=len(elevation) + 1,
+            index_col=0,
+            sep=" ",
+            engine="python"
+        ).T.iloc[0]
+    except FileNotFoundError:
+        print(f"Could not load {elevation_tiles.FICHERO.iloc[0]}")
+        return None
+
+    elevation[elevation == metadata.NODATA_VALUE] = np.nan
+    # points
+    # https://docs.scipy.org/doc/scipy/reference/generated/scipy.interpolate.RegularGridInterpolator.html
+
+    return 1
 
 
 if __name__ == "__main__":
