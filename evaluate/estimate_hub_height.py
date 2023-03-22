@@ -46,9 +46,9 @@ def main(run_name):
         turbine = turbines.query("site == @site and turbine_num == @turbine_num").iloc[0]
         site_metadata = sites[sites.site.eq(site)].iloc[0]
 
-        # Drop Ourol and Xiabre because the co-ordinates are for the wrong site with an
+        # Drop Ourol because the co-ordinates are for the wrong site with an
         # unknown hub height.
-        if site in ["ourol"]:  # , "xiabre"]:
+        if site in ["ourol"]:
             continue
 
         # Only Becerril has turbines listed with different heights
