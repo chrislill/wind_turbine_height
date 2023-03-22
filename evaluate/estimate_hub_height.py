@@ -39,7 +39,7 @@ def main(run_name):
     turbine_regex = re.compile(r"_(\d+)_")
     hub_height_regex = re.compile(r"([0-9]*[.]?[0-9]+)")
     turbine_list = []
-    for label_path in tqdm(label_paths):
+    for label_path in tqdm(list(label_paths)):
         name_split = turbine_regex.split(label_path.name)
         site = name_split[0]
         turbine_num = int(name_split[1])
@@ -48,7 +48,7 @@ def main(run_name):
 
         # Drop Ourol and Xiabre because the co-ordinates are for the wrong site with an
         # unknown hub height.
-        if site in ["ourol", "xiabre"]:
+        if site in ["ourol"]:  # , "xiabre"]:
             continue
 
         # Only Becerril has turbines listed with different heights

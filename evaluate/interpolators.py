@@ -75,15 +75,15 @@ class ElevationInterpolator:
         # Replace null values
         elevation_data[elevation_data == metadata.NODATA_VALUE] = np.nan
 
-        # Interpolate elevation
+        # Interpolate elevation. Note that 0, 0 is the NW corner of the data.
         x_values = np.linspace(
             metadata.XLLCENTER,
             metadata.XLLCENTER + (metadata.NCOLS - 1) * metadata.CELLSIZE,
             metadata.NCOLS,
         )
         y_values = np.linspace(
-            metadata.YLLCENTER,
             metadata.YLLCENTER + (metadata.NROWS - 1) * metadata.CELLSIZE,
+            metadata.YLLCENTER,
             metadata.NROWS,
         )
         self.interpolator = RegularGridInterpolator((y_values, x_values), elevation_data.to_numpy())
