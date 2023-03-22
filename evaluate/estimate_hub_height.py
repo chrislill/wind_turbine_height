@@ -4,15 +4,15 @@ import re
 
 import dotenv
 import matplotlib.pyplot as plt
-import geopandas as gpd
 import numpy as np
 import pandas as pd
 from pyproj import Transformer
 from osgeo import gdal  # noqa
 from scipy import stats
-from scipy.interpolate import RegularGridInterpolator
 from shapely.geometry import Point
 from skyfield import api as skyfield_api
+from tqdm import tqdm
+from evaluate import interpolators
 from prep_images.load_photo_metadata import load_photo_metadata
 
 
@@ -31,26 +31,21 @@ def main(run_name):
     # Load aerial photo data to find the nearest photo for each turbine
     photo_metadata = load_photo_metadata()
     transformer_to_30n = Transformer.from_crs(f"EPSG:4326", f"EPSG:25830")
-
-    # Load elevation metadata from Informacion_auxiliar_LIDAR_2_cobertura.zip
-    elevation_metadata = gpd.read_file(
-        "data/digital_elevation/coverage/MDT05.shp"  # noqa
-    ).set_geometry("geometry", drop=True)  # .assign(tile_centroid=lambda x: x.geometry.centroid)
+    elevation_interpolator = interpolators.ElevationInterpolator()
 
     turbine_regex = re.compile(r"_(\d+)_")
     hub_height_regex = re.compile(r"([0-9]*[.]?[0-9]+)")
     turbine_list = []
-    missing_list = []
-    for label_path in label_paths:
+    for label_path in tqdm(label_paths):
         name_split = turbine_regex.split(label_path.name)
         site = name_split[0]
         turbine_num = int(name_split[1])
         turbine = turbines.query("site == @site and turbine_num == @turbine_num").iloc[0]
         site_metadata = sites[sites.site.eq(site)].iloc[0]
 
-        # Drop Ourol and Xiabre because the co-ordinates are for the wrong site with an
+        # Drop Ourol because the co-ordinates are for the wrong site with an
         # unknown hub height.
-        if site in ["ourol", "xiabre"]:
+        if site in ["ourol"]:
             continue
 
         # Only Becerril has turbines listed with different heights
@@ -117,11 +112,11 @@ def main(run_name):
 
         # Find the timestamp for the nearest aerial photo
         point_x, point_y = transformer_to_30n.transform(base_latitude, base_longitude)
-        turbine_point = Point(point_x, point_y)
-        area_around_turbine = turbine_point.buffer(3100)
+        base_point = Point(point_x, point_y)
+        area_around_turbine = base_point.buffer(3100)
         nearest_photo = (
             photo_metadata[photo_metadata.within(area_around_turbine)]
-            .assign(distance_to_centroid=lambda x: x.distance(turbine_point))
+            .assign(distance_to_centroid=lambda x: x.distance(base_point))
             .sort_values("distance_to_centroid")
         )
         if nearest_photo.shape[0] > 0:
@@ -138,22 +133,14 @@ def main(run_name):
         altitude, azimuth, _ = observer.at(time).observe(sun).apparent().altaz()
         shadow_height = math.tan(altitude.radians) * shadow_length, 1
 
-        # Include topology correction
-        base_height = get_elevation(turbine_point, elevation_metadata)
-        hub_point = Point(transformer_to_30n.transform(base_latitude, base_longitude))
-        hub_shadow_height = get_elevation(hub_point, elevation_metadata)
-
-        # get_elevation returns the filename if the file is not present on disk
-        if isinstance(base_height, str):
-            missing_list.append(base_height)
-            continue
-        if isinstance(hub_shadow_height, str):
-            missing_list.append(hub_shadow_height)
-            continue
+        # Include topology correction.
+        base_height = elevation_interpolator.get_elevation(base_latitude, base_longitude)
+        hub_shadow_height = elevation_interpolator.get_elevation(hub_latitude, hub_longitude)
 
         height_correction = base_height - hub_shadow_height
+        if np.isnan(height_correction):
+            height_correction = 0
         estimated_hub_height = round(shadow_height[0] - height_correction, 1)
-        # estimated_hub_height = shadow_height[0]
 
         turbine_list.append(
             turbine_metadata
@@ -176,9 +163,11 @@ def main(run_name):
                 "photo_file": nearest_photo.photo_file,
             }
         )
-    missing_files = sorted(set(missing_list))
-    pd.Series(missing_files).to_csv(f"data/digital_elevation/{run_name}_missing_files.csv")
-    print(r"Saved list of missing files\n", missing_files)
+    if len(elevation_interpolator.missing_list) > 0:
+        pd.Series(sorted(set(elevation_interpolator.missing_list))).to_csv(
+            f"data/digital_elevation/{run_name}_missing_files.csv"
+        )
+    print(r"Saved list of missing files\n", elevation_interpolator.missing_list)
 
     turbines = pd.DataFrame(turbine_list).assign(
         missing_labels=lambda x: x.num_bases.eq(0) | x.num_hub_shadows.eq(0),
@@ -249,61 +238,6 @@ def calculate_coordinates(object_x, object_y, turbine, zone):
     latitude, longitude = transformer.transform(x_coordinate, y_coordinate)
 
     return latitude, longitude
-
-
-def get_elevation(point, elevation_metadata):
-    """Interpolate the elevation from a Digital Elevation tile
-
-    :param point: Point object with X, Y coordinates in UTM zone 30N
-    :param elevation_metadata: Geodataframe of elevation tiles
-    :return: height, or filename if it could not be loaded.
-    """
-    elevation_tiles = (
-        elevation_metadata[elevation_metadata.contains(point)]
-        .assign(distance_to_centroid=lambda x: x.distance(point))
-        .sort_values("distance_to_centroid")
-    )
-    if len(elevation_tiles) == 0:
-        return None
-    try:
-        elevation_data = pd.read_csv(
-            f"data/digital_elevation/files/{elevation_tiles.FICHERO.iloc[0]}",
-            skiprows=6,
-            skipfooter=1,
-            header=None,
-            sep=" ",
-            engine="python"
-        ).iloc[:, :-1]
-        metadata = pd.read_csv(
-            f"data/digital_elevation/files/{elevation_tiles.FICHERO.iloc[0]}",
-            header=None,
-            skipfooter=len(elevation_data) + 1,
-            index_col=0,
-            sep=" ",
-            engine="python"
-        ).T.iloc[0]
-    except FileNotFoundError:
-        print(f"Could not load {elevation_tiles.FICHERO.iloc[0]}")
-        return elevation_tiles.FICHERO.iloc[0]
-
-    # Replace null values
-    elevation_data[elevation_data == metadata.NODATA_VALUE] = np.nan
-
-    # Interpolate elevation
-    x_values = np.linspace(
-            metadata.XLLCENTER,
-            metadata.XLLCENTER + (metadata.NCOLS - 1) * metadata.CELLSIZE,
-            metadata.NCOLS
-        )
-    y_values = np.linspace(
-            metadata.YLLCENTER,
-            metadata.YLLCENTER + (metadata.NROWS - 1) * metadata.CELLSIZE,
-            metadata.NROWS
-        )
-    interpolator = RegularGridInterpolator((y_values, x_values), elevation_data.to_numpy())
-    elevation = interpolator([point.y, point.x])
-
-    return elevation[0]
 
 
 if __name__ == "__main__":
