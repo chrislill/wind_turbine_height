@@ -9,34 +9,37 @@ from osgeo import gdal
 def main():
     dotenv.load_dotenv(".env")
     dotenv.load_dotenv(".env.secret")
+    full_labels = os.getenv("full_site_labels")
+    orthophotos = pd.read_csv("data/orthophoto_metadata.csv")
 
     # We will output square images at their natural resolution. They will be at
     # least 640 wide and include 10px of padding. We will use roboflow to resize
     # them to 640px (or smaller)
     output_size = 640
-    data_version = os.getenv("labelled_sites_version")
 
     turbine_list = []
     for dataset in ["train", "valid", "test"]:
-    # for dataset in ["valid"]:
-        image_paths = Path(f"data/turbine_shadow_data/{data_version}/{dataset}/images").glob("*")
+        label_paths = Path(f"data/turbine_shadow_data/{full_labels}/{dataset}/labels").glob("*")
         os.makedirs(f"data/turbine_images/{dataset}", exist_ok=True)
-        for image_path in image_paths:
-            site = image_path.name.split("_png")[0]
-            image = gdal.Open(str(image_path))
-            label_path = (
-                Path(f"data/turbine_shadow_data/{data_version}/{dataset}/labels") / image_path.name
-            ).with_suffix(".txt")
+        for label_path in label_paths:
+            site = label_path.name.split("_png")[0]
+            image_path = (
+                Path(f"data/turbine_shadow_data/{full_labels}/{dataset}/labels") / label_path.name
+            ).with_suffix(".jpg")
+            orthophoto = orthophotos[orthophotos.site.eq(site)].iloc[0]
             turbine_labels = (
                 pd.concat(
                     [
                         pd.DataFrame(
                             {
                                 "site": site,
-                                "src_width": image.RasterXSize,
-                                "src_height": image.RasterYSize,
-                                "filename": image_path.name,
-                                "created_time": image_path.stat().st_ctime
+                                "src_width": int(2000 / orthophoto.resolution),
+                                "src_height": int(2000 / orthophoto.resolution),
+                                "resolution": orthophoto.resolution,
+                                "site_corner_x": orthophoto.corner_x,
+                                "site_corner_y": orthophoto.corner_y,
+                                "image_file": image_path.name,
+                                "zone": orthophoto.zone
                             },
                             index=[0],
                         ),
@@ -60,10 +63,13 @@ def main():
                         (x[["width_px", "height_px"]] + 20).assign(size=output_size).max(axis=1)
                     ),
                     left_offset=lambda x: x.center_x_px - x.max_size.divide(2),
-                    top_offset=lambda x: x.center_y_px - x.max_size.divide(2)
+                    top_offset=lambda x: x.center_y_px - x.max_size.divide(2),
+                    turbine_corner_x=lambda x: x.site_corner_x + (x.left_offset * x.resolution),
+                    turbine_corner_y=lambda x: x.site_corner_y - (x.top_offset * x.resolution),
                 )
             )
             turbine_list.append(turbine_labels)
+            image = gdal.Open(str(image_path))
             for _, label in turbine_labels.iterrows():
                 gdal.Translate(
                     f"data/turbine_images/{dataset}/{label.site}_{label.turbine_num}.png",

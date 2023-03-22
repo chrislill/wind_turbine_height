@@ -1,12 +1,10 @@
-SET experiment=023_active_learning_paste
+SET experiment=033_bounding_box_shear_both_15
 SET baseline=001_initial_model
 SET run=5
-SET data=v002_active_learning
+SET data=v016
 SET yolo_path=%USERPROFILE%/Code/yolov7
-SET hyp_path=hyperparameters\hyp.paste_in_10.yaml
-
+SET hyp_path=hyperparameters\hyp.default.yaml
 SET weights_path=.\runs\train\%baseline%%run%\weights\best.pt
-:: SET weights_path=.\runs\train\%experiment%\weights\last.pt
 
 CALL CD %USERPROFILE%\Code\wind_turbine_height\hub_shadow_model
 CALL ..\yolov7_venv\scripts\activate
