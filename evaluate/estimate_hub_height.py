@@ -7,6 +7,7 @@ import dotenv
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import statsmodels.stats.power as smp
 from osgeo import gdal  # noqa
 from pyproj import Transformer
 from scipy import stats
@@ -171,7 +172,7 @@ def main(run_name):
         pd.Series(sorted(set(elevation_interpolator.missing_list))).to_csv(
             f"data/digital_elevation/{run_name}_missing_files.csv"
         )
-    print(r"Saved list of missing files\n", elevation_interpolator.missing_list)
+        print(r"Saved list of missing files\n", elevation_interpolator.missing_list)
 
     turbines = pd.DataFrame(turbine_list).assign(
         missing_labels=lambda x: x.num_bases.eq(0) | x.num_hub_shadows.eq(0),
@@ -230,8 +231,13 @@ def main(run_name):
     )
     p_value = p_lower + p_upper
     summary = f"{run_name} P-value: {p_value:.3f}\nP-lower: {p_lower:.3f}\nP-upper: {p_upper:.3f}"
+    observations = (~site_results.hub_height_diff.isna()).sum()
+    print(f"Observations: {observations}")
     print(summary)
     print(stats.shapiro(site_results.hub_height_diff.dropna()))
+    print(
+        f"Power {smp.ttest_power(0.8, nobs=observations, alpha=0.05, alternative='two-sided'):.0%}"
+    )
     print(f"Duration: {round(((datetime.now() - start_time).total_seconds() + 61) / 60, 1)} min")
 
 

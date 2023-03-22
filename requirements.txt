@@ -61,3 +61,4 @@ scikit-learn
 seaborn
 shapely
 skyfield
+statsmodels
