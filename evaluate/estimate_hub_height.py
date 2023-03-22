@@ -40,7 +40,7 @@ def main(run_name):
     turbine_regex = re.compile(r"_(\d+)_")
     hub_height_regex = re.compile(r"([0-9]*[.]?[0-9]+)")
     turbine_list = []
-    file_list = []
+    missing_list = []
     for label_path in label_paths:
         name_split = turbine_regex.split(label_path.name)
         site = name_split[0]
@@ -142,11 +142,18 @@ def main(run_name):
         base_height = get_elevation(turbine_point, elevation_metadata)
         hub_point = Point(transformer_to_30n.transform(base_latitude, base_longitude))
         hub_shadow_height = get_elevation(hub_point, elevation_metadata)
-        file_list.append(base_height)
-        file_list.append(hub_shadow_height)
-        # height_correction = base_height - hub_shadow_height
-        # estimated_hub_height = round(shadow_height[0] - height_correction, 1)
-        estimated_hub_height = shadow_height[0]
+
+        # get_elevation returns the filename if the file is not present on disk
+        if isinstance(base_height, str):
+            missing_list.append(base_height)
+            continue
+        if isinstance(hub_shadow_height, str):
+            missing_list.append(hub_shadow_height)
+            continue
+
+        height_correction = base_height - hub_shadow_height
+        estimated_hub_height = round(shadow_height[0] - height_correction, 1)
+        # estimated_hub_height = shadow_height[0]
 
         turbine_list.append(
             turbine_metadata
@@ -163,14 +170,15 @@ def main(run_name):
                 "base_longitude": round(base_longitude, 6),
                 "hub_latitude": round(hub_latitude, 6),
                 "hub_longitude": round(hub_longitude, 6),
-                # "base_height": round(base_height, 1),
-                # "hub_shadow_height": round(hub_shadow_height, 1),
-                # "height_correction": round(height_correction, 1),
+                "base_height": round(base_height, 1),
+                "hub_shadow_height": round(hub_shadow_height, 1),
+                "height_correction": round(height_correction, 1),
                 "photo_file": nearest_photo.photo_file,
             }
         )
-    files = sorted(set(file_list))
-    pd.Series(files).to_csv(f"data/digital_elevation/{run_name}_dsm_files.csv")
+    missing_files = sorted(set(missing_list))
+    pd.Series(missing_files).to_csv(f"data/digital_elevation/{run_name}_missing_files.csv")
+    print(r"Saved list of missing files\n", missing_files)
 
     turbines = pd.DataFrame(turbine_list).assign(
         missing_labels=lambda x: x.num_bases.eq(0) | x.num_hub_shadows.eq(0),
@@ -244,11 +252,11 @@ def calculate_coordinates(object_x, object_y, turbine, zone):
 
 
 def get_elevation(point, elevation_metadata):
-    """
+    """Interpolate the elevation from a Digital Elevation tile
 
-    :param point:
-    :param elevation_metadata:
-    :return: height
+    :param point: Point object with X, Y coordinates in UTM zone 30N
+    :param elevation_metadata: Geodataframe of elevation tiles
+    :return: height, or filename if it could not be loaded.
     """
     elevation_tiles = (
         elevation_metadata[elevation_metadata.contains(point)]
@@ -258,7 +266,7 @@ def get_elevation(point, elevation_metadata):
     if len(elevation_tiles) == 0:
         return None
     try:
-        elevation = pd.read_csv(
+        elevation_data = pd.read_csv(
             f"data/digital_elevation/files/{elevation_tiles.FICHERO.iloc[0]}",
             skiprows=6,
             skipfooter=1,
@@ -269,22 +277,35 @@ def get_elevation(point, elevation_metadata):
         metadata = pd.read_csv(
             f"data/digital_elevation/files/{elevation_tiles.FICHERO.iloc[0]}",
             header=None,
-            skipfooter=len(elevation) + 1,
+            skipfooter=len(elevation_data) + 1,
             index_col=0,
             sep=" ",
             engine="python"
         ).T.iloc[0]
     except FileNotFoundError:
         print(f"Could not load {elevation_tiles.FICHERO.iloc[0]}")
-        return None
+        return elevation_tiles.FICHERO.iloc[0]
 
-    elevation[elevation == metadata.NODATA_VALUE] = np.nan
-    # points
-    # https://docs.scipy.org/doc/scipy/reference/generated/scipy.interpolate.RegularGridInterpolator.html
+    # Replace null values
+    elevation_data[elevation_data == metadata.NODATA_VALUE] = np.nan
 
-    return 1
+    # Interpolate elevation
+    x_values = np.linspace(
+            metadata.XLLCENTER,
+            metadata.XLLCENTER + (metadata.NCOLS - 1) * metadata.CELLSIZE,
+            metadata.NCOLS
+        )
+    y_values = np.linspace(
+            metadata.YLLCENTER,
+            metadata.YLLCENTER + (metadata.NROWS - 1) * metadata.CELLSIZE,
+            metadata.NROWS
+        )
+    interpolator = RegularGridInterpolator((y_values, x_values), elevation_data.to_numpy())
+    elevation = interpolator([point.y, point.x])
+
+    return elevation[0]
 
 
 if __name__ == "__main__":
     main("test")
-    main("train")
+    # main("train")
