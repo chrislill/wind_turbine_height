@@ -134,7 +134,7 @@ def main(run_name):
         )
         time = skyfield_api.load.timescale().from_datetime(nearest_photo.photo_timestamp)
         altitude, azimuth, _ = observer.at(time).observe(sun).apparent().altaz()
-        shadow_height = math.tan(altitude.radians) * shadow_length, 1
+        shadow_height = math.tan(altitude.radians) * shadow_length
 
         # Include topology correction.
         base_height = elevation_interpolator.get_elevation(base_latitude, base_longitude)
@@ -143,7 +143,7 @@ def main(run_name):
         height_correction = base_height - hub_shadow_height
         if np.isnan(height_correction):
             height_correction = 0
-        estimated_hub_height = round(shadow_height[0] - height_correction, 1)
+        estimated_hub_height = round(shadow_height - height_correction, 1)
 
         turbine_list.append(
             turbine_metadata
@@ -151,7 +151,7 @@ def main(run_name):
                 "actual_hub_height": actual_hub_height,
                 "estimated_hub_height": estimated_hub_height,
                 "hub_height_diff": estimated_hub_height - actual_hub_height,
-                "shadow_height": round(shadow_height[0], 1),
+                "shadow_height": round(shadow_height, 1),
                 "base_height": round(base_height, 1),
                 "hub_shadow_height": round(hub_shadow_height, 1),
                 "height_correction": round(height_correction, 1),
@@ -246,5 +246,5 @@ def calculate_coordinates(object_x, object_y, turbine, zone):
 
 
 if __name__ == "__main__":
-    main("test")
-    # main("train")
+    # main("test")
+    main("train")
