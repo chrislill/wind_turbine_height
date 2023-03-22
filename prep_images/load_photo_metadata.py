@@ -17,6 +17,18 @@ def main():
     # Load Spanish wind farm metadata, provided by Aurora Energy Research
     # Some wind farms have multiple turbine configurations
     site_metadata = pd.read_csv(os.getenv("site_metadata_path"))
+
+    # BUGFIX: Coordinates for five sites were updated in February, but images
+    # were not regenerated. Use the old values so that the coordinates match the
+    # images. This might cause issues for hub height estimation.
+    # TODO: Use a merge rather than this loop. If I wasn't on a deadline...
+    old_matches = pd.read_csv("data/sites/matches_20221217_120744.csv")
+    for site in ["ausine", "serra_outes", "tella", "viudo", "xiabre"]:
+        for column in ["latitude", "longitude"]:
+            site_metadata.loc[site_metadata.site.eq(site), column] = old_matches.loc[
+                old_matches.site.eq(site), column
+            ].iloc[0]
+
     sites = (
         site_metadata.query("selected == True")
         .groupby("site")

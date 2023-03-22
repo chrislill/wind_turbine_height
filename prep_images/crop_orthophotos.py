@@ -13,17 +13,6 @@ def main():
     # Load site photo metadata
     site_metadata = pd.read_csv("data/site_photo_metadata.csv")
 
-    # BUGFIX: Coordinates for five sites were updated in February, but images
-    # were not regenerated. Use the old values so that the coordinates match the
-    # images. This might cause issues for hub height estimation.
-    # TODO: Use a merge rather than this loop. If I wasn't on a deadline...
-    old_sites = pd.read_csv("data/site_photo_metadata_20221220.csv")
-    for site in ["ausine", "serra_outes", "tella", "viudo", "xiabre"]:
-        for column in ["latitude", "longitude"]:
-            site_metadata.loc[site_metadata.site.eq(site), column] = old_sites.loc[
-                old_sites.site.eq(site), column
-            ].iloc[0]
-
     orthophoto_list = []
     for _, site in site_metadata.iterrows():
         print(f"Cropping {site.site}")
