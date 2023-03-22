@@ -19,15 +19,14 @@ def main():
 
     turbine_list = []
     for dataset in ["train", "valid", "test"]:
-        image_paths = Path(f"data/turbine_shadow_data/{full_labels}/{dataset}/images").glob("*")
+        label_paths = Path(f"data/turbine_shadow_data/{full_labels}/{dataset}/labels").glob("*")
         os.makedirs(f"data/turbine_images/{dataset}", exist_ok=True)
-        for image_path in image_paths:
-            site = image_path.name.split("_png")[0]
+        for label_path in label_paths:
+            site = label_path.name.split("_png")[0]
+            image_path = (
+                Path(f"data/turbine_shadow_data/{full_labels}/{dataset}/labels") / label_path.name
+            ).with_suffix(".jpg")
             orthophoto = orthophotos[orthophotos.site.eq(site)].iloc[0]
-            image = gdal.Open(str(image_path))
-            label_path = (
-                Path(f"data/turbine_shadow_data/{full_labels}/{dataset}/labels") / image_path.name
-            ).with_suffix(".txt")
             turbine_labels = (
                 pd.concat(
                     [
@@ -70,6 +69,7 @@ def main():
                 )
             )
             turbine_list.append(turbine_labels)
+            image = gdal.Open(str(image_path))
             for _, label in turbine_labels.iterrows():
                 gdal.Translate(
                     f"data/turbine_images/{dataset}/{label.site}_{label.turbine_num}.png",
