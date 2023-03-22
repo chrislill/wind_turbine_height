@@ -1,22 +1,25 @@
 import math
-from pathlib import Path
 import re
+from datetime import datetime
+from pathlib import Path
 
 import dotenv
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from pyproj import Transformer
 from osgeo import gdal  # noqa
+from pyproj import Transformer
 from scipy import stats
 from shapely.geometry import Point
 from skyfield import api as skyfield_api
 from tqdm import tqdm
+
 from evaluate import interpolators
 from prep_images.load_photo_metadata import load_photo_metadata
 
 
 def main(run_name):
+    start_time = datetime.now()
     dotenv.load_dotenv(".env")
     dotenv.load_dotenv(".env.secret")
 
@@ -43,9 +46,9 @@ def main(run_name):
         turbine = turbines.query("site == @site and turbine_num == @turbine_num").iloc[0]
         site_metadata = sites[sites.site.eq(site)].iloc[0]
 
-        # Drop Ourol because the co-ordinates are for the wrong site with an
+        # Drop Ourol and Xiabre because the co-ordinates are for the wrong site with an
         # unknown hub height.
-        if site in ["ourol"]:
+        if site in ["ourol", "xiabre"]:
             continue
 
         # Only Becerril has turbines listed with different heights
@@ -148,6 +151,10 @@ def main(run_name):
                 "actual_hub_height": actual_hub_height,
                 "estimated_hub_height": estimated_hub_height,
                 "hub_height_diff": estimated_hub_height - actual_hub_height,
+                "shadow_height": round(shadow_height[0], 1),
+                "base_height": round(base_height, 1),
+                "hub_shadow_height": round(hub_shadow_height, 1),
+                "height_correction": round(height_correction, 1),
                 "azimuth_diff": abs(int(shadow_azimuth) - int(azimuth.degrees)),
                 "shadow_azimuth": round(shadow_azimuth, 1),
                 "azimuth": round(azimuth.degrees, 1),
@@ -157,9 +164,6 @@ def main(run_name):
                 "base_longitude": round(base_longitude, 6),
                 "hub_latitude": round(hub_latitude, 6),
                 "hub_longitude": round(hub_longitude, 6),
-                "base_height": round(base_height, 1),
-                "hub_shadow_height": round(hub_shadow_height, 1),
-                "height_correction": round(height_correction, 1),
                 "photo_file": nearest_photo.photo_file,
             }
         )
@@ -188,6 +192,7 @@ def main(run_name):
                 "altitude": "count",
             }
         )
+        .round(1)
         .rename(columns={"altitude": "valid_estimates"})
         .join(
             turbines[~turbines.good_estimate]
@@ -227,7 +232,7 @@ def main(run_name):
     summary = f"{run_name} P-value: {p_value:.3f}\nP-lower: {p_lower:.3f}\nP-upper: {p_upper:.3f}"
     print(summary)
     print(stats.shapiro(site_results.hub_height_diff.dropna()))
-    print("End")
+    print(f"Duration: {round(((datetime.now() - start_time).total_seconds() + 61) / 60, 1)} min")
 
 
 def calculate_coordinates(object_x, object_y, turbine, zone):
