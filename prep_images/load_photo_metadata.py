@@ -27,7 +27,7 @@ def main():
         for column in ["latitude", "longitude"]:
             site_metadata.loc[site_metadata.site.eq(site), column] = old_matches.loc[
                 old_matches.site.eq(site), column
-            ].iloc[0]
+            ].mean()
 
     sites = (
         site_metadata.query("selected == True")
