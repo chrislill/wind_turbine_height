@@ -49,7 +49,7 @@ def main(run_name):
 
         # Drop Ourol because the co-ordinates are for the wrong site with an
         # unknown hub height.
-        if site in ["ourol"]:
+        if site in ["ourol", "sotillo_vm"]:
             continue
 
         # Only Becerril has turbines listed with different heights
@@ -177,7 +177,7 @@ def main(run_name):
     turbines = pd.DataFrame(turbine_list).assign(
         missing_labels=lambda x: x.num_bases.eq(0) | x.num_hub_shadows.eq(0),
         multiple_labels=lambda x: (x.num_bases + x.num_hub_shadows).gt(2) & ~x.missing_labels,
-        azimuth_mismatch=lambda x: x.azimuth_diff.gt(10) & ~x.multiple_labels,
+        azimuth_mismatch=lambda x: x.azimuth_diff.gt(5) & ~x.multiple_labels,
         good_estimate=lambda x: (
             ~x[["missing_labels", "multiple_labels", "azimuth_mismatch"]].any(axis=1)
         ),
@@ -208,11 +208,17 @@ def main(run_name):
 
     # Plot histogram of hub height errors, using bins of 2m width
     fig, ax = plt.subplots(figsize=(6, 4))
-    bins = range(
-        (round(site_results.hub_height_diff.min() / 2) * 2) - 1,
-        (round(site_results.hub_height_diff.max() / 2) * 2) + 3,
-        2,
-    )
+    if run_name == "test":
+        bins = range(
+            math.floor(site_results.hub_height_diff.min()),
+            math.ceil(site_results.hub_height_diff.max()) + 1
+        )
+    else:
+        bins = range(
+            (round(site_results.hub_height_diff.min() / 2) * 2) - 1,
+            (round(site_results.hub_height_diff.max() / 2) * 2) + 3,
+            2,
+        )
     site_results.hub_height_diff.plot.hist(bins=bins, ax=ax, label="_remove")
     ax.set_xlabel(f"Hub height errors in the {run_name}ing set (m)")
     ax.axvline(-5, color="green", linestyle="dotted", label="Required accuracy of 5m")
@@ -223,10 +229,10 @@ def main(run_name):
 
     # Carry out a one sample, two-tailed t-test
     # Null hypothesis: Error < -5m or Error > 5m
-    _, p_lower = stats.ttest_1samp(
+    r_lower, p_lower = stats.ttest_1samp(
         site_results.hub_height_diff, -5, nan_policy="omit", alternative="greater"
     )
-    _, p_upper = stats.ttest_1samp(
+    r_upper, p_upper = stats.ttest_1samp(
         site_results.hub_height_diff, 5, nan_policy="omit", alternative="less"
     )
     p_value = p_lower + p_upper
@@ -252,5 +258,5 @@ def calculate_coordinates(object_x, object_y, turbine, zone):
 
 
 if __name__ == "__main__":
-    # main("test")
+    main("test")
     main("train")
