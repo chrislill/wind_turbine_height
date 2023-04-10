@@ -1,6 +1,6 @@
 # Data-centric estimation of wind turbine height using aerial imagery
 
-This solution estimates the hub height of wind turbines from aerial photograph and their timestamps. It is the basis of the final project for my MSc in Data Science and includes my [final project report](Data-centric estimation of wind turbine hub height using aerial imagery.pdf).
+This solution estimates the hub height of wind turbines from aerial photograph and their timestamps. It is the basis of the final project for my MSc in Data Science and includes my [final project report](Data-centric%20estimation%20of%20wind%20turbine%20hub%20height%20using%20aerial%20imagery.pdf).
 
 ## Abstract
 Data-centric AI is the systematic engineering of data to improve performance, and is a mindset that is actively promoted in the data science community. This project measures the benefit of different data-centric techniques. It focuses on a novel task to estimate wind turbine hub height from aerial imagery in Spain, using computer vision models to measure the turbine shadow and the image timestamp to calculate the turbine height. 
